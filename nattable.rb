@@ -36,8 +36,9 @@ class NATTable
     @anchor = Entry.new
     @anchor.prev = @anchor
     @anchor.next = @anchor
-    @locals = {}  # index of entries with key: local_addr + local_port + remote_addr + remote_port
-    @remotes = {} # index of entries with key: global_port + remote_addr + remote_port
+    @locals = {}  # index of entries with key (depends on NATTable type)
+    @locals_last_assigned = {}  # index of entries with key (depends on NATTable type)
+    @remotes = {} # index of entries with key (depends on NATTable type)
     @global_ports = []
     @get_logfp = proc {}
   end
@@ -51,7 +52,8 @@ class NATTable
       l4 = packet.l4
       local_port = l4.src_port
       remote_port = l4.dest_port
-      global_port = empty_port(remote_addr, remote_port)
+      last_assigned = @locals_last_assigned[packet.src_addr+[local_port].pack('n')]
+      global_port = empty_port(remote_addr, remote_port, local_port, last_assigned)
       if global_port.nil?
         log('no_empty_port', local_addr, local_port, nil, remote_addr, remote_port, { 'table_size' => size })
         return nil
@@ -129,6 +131,7 @@ class NATTable
 
     entry.link(@anchor)
     @locals[local_key_from_tuple(local_addr, local_port, remote_addr, remote_port)] = entry
+    @locals_last_assigned[local_addr + [local_port].pack('n')] = global_port
     @remotes[remote_key_from_tuple(global_port, remote_addr, remote_port)] = entry
 
     entry
@@ -154,7 +157,7 @@ class NATTable
 end
 
 class SymmetricNATTable < NATTable
-  def empty_port(remote_addr, remote_port)
+  def empty_port(remote_addr, remote_port, _local_port, _last_assigned)
     gc
     20.times do
       test_port = @global_ports[rand(@global_ports.length)]
@@ -180,8 +183,60 @@ class SymmetricNATTable < NATTable
   end
 end
 
+# quasi-EIM/APDF NAT. Much like netfilter.
+class PortRestrictedConeNATTable < SymmetricNATTable
+  def empty_port(remote_addr, remote_port, local_port, last_assigned)
+    gc
+    if !last_assigned.nil?
+      return last_assigned unless @remotes[remote_key_from_tuple(last_assigned, remote_addr, remote_port)]
+    end
+    if (9000 <= local_port && local_port <= 9999)
+      return local_port unless @remotes[remote_key_from_tuple(local_port, remote_addr, remote_port)]
+    end
+    20.times do
+      test_port = @global_ports[rand(@global_ports.length)]
+      return test_port unless @remotes[remote_key_from_tuple(test_port, remote_addr, remote_port)]
+    end
+    nil
+  end
+end
+
+# indifferent to remote port
+class RestrictedConeNATTable < NATTable
+  def empty_port(remote_addr, _remote_port, local_port, last_assigned)
+    gc
+    if !last_assigned.nil?
+      return last_assigned unless @remotes[remote_key_from_tuple(last_assigned, remote_addr, _remote_port)]
+    end
+      if (9000 <= local_port && local_port <= 9999)
+      return local_port unless @remotes[remote_key_from_tuple(local_port, remote_addr, _remote_port)]
+    end
+    20.times do
+      test_port = @global_ports[rand(@global_ports.length)]
+      return test_port unless @remotes[remote_key_from_tuple(test_port, remote_addr, _remote_port)]
+    end
+    nil
+  end
+
+  def local_key_from_packet(packet)
+    packet.tuple + [packet.l4.src_port].pack('n')
+  end
+
+  def local_key_from_tuple(local_addr, local_port, remote_addr, _remote_port)
+    local_addr + remote_addr + [local_port].pack('n')
+  end
+
+  def remote_key_from_packet(packet)
+    packet.src_addr + [packet.l4.dest_port].pack('n')
+  end
+
+  def remote_key_from_tuple(global_port, remote_addr, _remote_port)
+    remote_addr + [global_port].pack('n')
+  end
+end
+
 class ConeNATTable < NATTable
-  def empty_port(_remote_addr, _remote_port)
+  def empty_port(_remote_addr, _remote_port, local_port, _last_assigned) # using last_assigned is also possible
     gc
     @empty_ports = global_ports.dup if @empty_ports.nil?
     return nil if @empty_ports.empty?

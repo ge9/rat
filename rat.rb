@@ -42,9 +42,9 @@ $nat = Nat.new
 $nat.global_addr = "\xc0\xa8\x0\x8b".b
 
 # create TCP, UDP, ICMP Echo tables
-$nat.tcp_table = SymmetricNATTable.new('tcp')
+$nat.tcp_table = RestrictedConeNATTable.new('tcp')
 $nat.tcp_table.idle_timeout = 300
-$nat.udp_table = ConeNATTable.new('udp')
+$nat.udp_table = RestrictedConeNATTable.new('udp')
 $nat.udp_table.idle_timeout = 30
 $nat.icmp_echo_table = SymmetricNATTable.new('icmp-echo')
 $nat.icmp_echo_table.idle_timeout = 30
