@@ -36,6 +36,22 @@ else
   end
 end
 
+def port_gen(cycle_size, cycle_nums, cycle_starts, portset_offset, portset_size)
+  range=[]
+  for n in 0...cycle_nums
+    start = cycle_starts+(n*cycle_size)+portset_offset;
+    v = (start...start+portset_size-1).to_a;
+    range.concat(v);
+  end
+  range
+end
+def port_gen_v6plus(psid)
+  port_gen(4096, 15, 4096, (psid<<4), 16)
+end
+def port_gen_ocn_vc(psid)
+  port_gen(1024, 63, 1024, (psid<<4), 16)
+end
+
 $nat = Nat.new
 
 # global address is 192.168.0.139
@@ -52,6 +68,7 @@ $nat.icmp_echo_table.idle_timeout = 30
 # setup ports and logger for each table
 [$nat.tcp_table, $nat.udp_table, $nat.icmp_echo_table].each do |table|
   table.global_ports.push(*(9000..9999))
+  #table.global_ports=port_gen_v6plus(30)
   table.get_logfp = proc do
     $logfp = open('rat.log', 'a') if $logfp.nil?
     $logfp

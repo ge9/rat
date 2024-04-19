@@ -24,9 +24,9 @@ class NATTable
     end
 
     def unlink
-      prev.next = self.next
-      self.next.prev = prev
-      prev = nil
+      self.prev.next = self.next
+      self.next.prev = self.prev
+      self.prev = nil
       self.next = nil
     end
   end
@@ -190,9 +190,9 @@ class PortRestrictedConeNATTable < SymmetricNATTable
     if !last_assigned.nil?
       return last_assigned unless @remotes[remote_key_from_tuple(last_assigned, remote_addr, remote_port)]
     end
-    if (9000 <= local_port && local_port <= 9999)
-      return local_port unless @remotes[remote_key_from_tuple(local_port, remote_addr, remote_port)]
-    end
+    # if (9950 <= local_port && local_port <= 9999)
+    #   return local_port unless @remotes[remote_key_from_tuple(local_port, remote_addr, remote_port)]
+    # end
     20.times do
       test_port = @global_ports[rand(@global_ports.length)]
       return test_port unless @remotes[remote_key_from_tuple(test_port, remote_addr, remote_port)]
@@ -208,9 +208,9 @@ class RestrictedConeNATTable < NATTable
     if !last_assigned.nil?
       return last_assigned unless @remotes[remote_key_from_tuple(last_assigned, remote_addr, _remote_port)]
     end
-      if (9000 <= local_port && local_port <= 9999)
-      return local_port unless @remotes[remote_key_from_tuple(local_port, remote_addr, _remote_port)]
-    end
+    # if (9950 <= local_port && local_port <= 9999)
+    #   return local_port unless @remotes[remote_key_from_tuple(local_port, remote_addr, _remote_port)]
+    # end
     20.times do
       test_port = @global_ports[rand(@global_ports.length)]
       return test_port unless @remotes[remote_key_from_tuple(test_port, remote_addr, _remote_port)]
