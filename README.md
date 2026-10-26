@@ -7,16 +7,20 @@ It is written as a TUN device.
 ## Features
 
 - Supported...TCP, UDP, ICMP Echo Request/Reply (outbound ping), inbound ICMP Errors (Destination Unreachable, Time Exceeded, Packet Too Big(v6))
+  - For ICMP Echo, the identifier is treated as port
 - Unsupported...IP fragment packet, SCTP, DCCP, static NAT, stateful inspection on TCP
 - NAT tables (refer to RFC 4787 etc.)
   - Full Cone NAT
     - A simple 1:1 NAPT. The number of NAT mappings will be capped by the number of external ports (unlike others).
   - (quasi-) Restricted Cone NAT
     - Actually has "Address-Dependent" mapping, but tries to use the same port number for a same internal port, so behaves like EIM/ADF in most cases.
+    - "NAT Type A" in Nintendo Switch.
+    - Recommended if external ports are few.
   - (quasi-) Port-Restricted Cone NAT
     - Similar as above. Much like netfilter's default SNAT/MASQUERADE behavior.
   - Symmetric NAT
     - The port number is always randomized, hence APDM/APDF. Much like netfilter's SNAT/MASQUERADE with `--random`.
+- Port range generator for "v6プラス", "OCNバーチャルコネクト".
 - The status can be checked through Web interface (*:8080).
 - May not work in Windows.
 
@@ -74,4 +78,9 @@ Some other parameters (NAT behavior, timeout, port range, etc.) are also hard-co
   sudo ufw route allow to 192.168.0.139
   sudo ufw allow in on rat
   sudo ufw route allow in on rat
+  ```
+- (optional) disable unnecessary conntrack to save CPU power
+  ```
+  sudo iptables -t raw -I OUTPUT -s 192.168.1.2  -j CT --notrack
+  sudo iptables -t raw -I PREROUTING -s 192.168.2.0/24  -j CT --notrack
   ```
